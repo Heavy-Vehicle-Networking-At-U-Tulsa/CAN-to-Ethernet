@@ -15,5 +15,5 @@ These lessons are designed to walk you through using the different features of t
 ## Deliverable
 Capture a screenshot your code and the serial terminal output. Print the screenshot with your name on it and submit it to your instructor. The screenshot should look something like this:
 
-![LinkStatus Capture Screenshot](images/LinkStatusCapture.PNG LinkStatus Capture Screenshot)
+![LinkStatus Capture Screenshot](images/LinkStatusCapture.PNG)
 
