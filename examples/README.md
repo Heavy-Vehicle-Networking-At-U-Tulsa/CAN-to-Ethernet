@@ -7,14 +7,13 @@ These lessons are designed to walk you through using the different features of t
 
 # Lesson 1 - Link Status
 ## Procedure
-  	1. Connect your board to an Ethernet and Ethernet switch.
-	2. Open the LinkStatus example from the Ethernet library
-	3. Uncomment the `Ethernet.init(10);` line to select pin 10. Verify this is the correct pin by examining the schematics
-	4. Under Sketch, select Upload and verify the compile and upload. Troubleshoot as nescessary.
-	5. Open a Serial terminal and show the output. Unplug and replug the Ethernet cable to show a change in the link status.
-	6. 
+  1. Connect your board to an Ethernet and Ethernet switch.
+  2. Open the LinkStatus example from the Ethernet library
+  3. Uncomment the `Ethernet.init(10);` line to select pin 10. Verify this is the correct pin by examining the schematics
+  4. Under Sketch, select Upload and verify the compile and upload. Troubleshoot as nescessary.
+  5. Open a Serial terminal and show the output. Unplug and replug the Ethernet cable to show a change in the link status.
 ## Deliverable
 Capture a screenshot your code and the serial terminal output. Print the screenshot with your name on it and submit it to your instructor. The screenshot should look something like this:
 
-!(images/LinkStatusCapture.PNG)[LinkStatus Captuer Screenshot]
+![images/LinkStatusCapture.PNG](LinkStatus Captuer Screenshot)
 
