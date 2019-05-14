@@ -54,7 +54,6 @@ void setup()
 //Loop Block
 void loop()
 {
-  
   while (true){
     if(Can0.read(rxmsg0)){
       printFrame(rxmsg0, 0, RXCount0++);
