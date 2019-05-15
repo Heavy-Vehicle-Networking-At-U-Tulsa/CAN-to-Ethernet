@@ -33,8 +33,11 @@ uint32_t RXCount1 = 0;
 //Define message structure from FlexCAN library
 static CAN_message_t rxmsg;
 static CAN_message_t txmsg;
+const int wLED = 16;
+const int rLED = 5;
 
-boolean LED_state;
+boolean wLED_state;
+boolean rLED_state;
 //A generic CAN Frame print function for the Serial terminal
 void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
 {
@@ -82,9 +85,12 @@ void setup()
   pinMode(pwmPin, OUTPUT);
   
   //LED Code for visualization
-  pinMode(LED_BUILTIN, OUTPUT);
-  LED_state = true;
-  digitalWrite(LED_BUILTIN, LED_state);
+  pinMode(wLED, OUTPUT);
+  pinMode(rLED, OUTPUT);
+  wLED_state = true;
+  rLED_state = true;
+  digitalWrite(wLED, wLED_state);
+  digitalWrite(rLED, rLED_state);
 
   while(!Serial);
   Serial.println("Starting CAN test.");
@@ -107,11 +113,15 @@ void loop() {
       Serial.println("Connected!");
     }
     else{
+      rLED_state = !rLED_state;
+      digitalWrite(rLED, rLED_state);
       Serial.println("Connection Failed...");
     }
   }
   else{ //This code runs once the Server-Client connection is established 
-    
+    while(Can0.read(rxmsg)){
+      
+    }
   }
   
 }
