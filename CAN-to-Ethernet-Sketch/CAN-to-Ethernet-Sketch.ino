@@ -16,6 +16,7 @@
 #include <Ethernet.h>
 #include <SPI.h>
 #include <FlexCAN.h>
+#include <CryptoAccel.h>
 
 const int pwmPin = 30;
 
@@ -54,16 +55,42 @@ void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
 //Arduino Setup
 void setup()
 {
+  // Start of setup. Code that only runs once
+  Serial.begin(9600);
   Serial.println("Made it to setup!");
+  
+  //Cryptography Code: We are going to use AES 256 bit encryption
+  unsigned int i; // We will use this to parse later
+  
+  unsigned char aeskey[32] = 
+  {
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
+  }; 
+  
+  // Okay, I'm cheating here by using a preset key. Shoot me. 
+  // Ideally, this key will be generated through a Diffie-Helmann Key Exchange within the connection phase of the server-client connection
+  // For now, this works. The important thing is that the key is 256 bits, or 32 bytes. more specifically, an array of 32 bytes. This will be important later
+  
+  unsigned char keysched[4*60]; // Key schedule output. I don't really know how this works to be honest. I just know that for this data type
+  mmcau_aes_set_key(aeskey, 256, keysched); //This is an AES key expansion. It accepts the variables that we just declared and it's output points to the keysched var
+
+  //At this point we are prepared to do encryption of data. The data needs to be placed into 16 byte chunks. Current plan is to build the payload, encrypt it, then send it.
+  
+  //PWM Setup Code: Future project
   pinMode(pwmPin, OUTPUT);
-  //Start of CAN Stuff
+  
+  //LED Code for visualization
   pinMode(LED_BUILTIN, OUTPUT);
   LED_state = true;
   digitalWrite(LED_BUILTIN, LED_state);
-  
+
   while(!Serial);
   Serial.println("Starting CAN test.");
-  //Start of Ethernet Stuff
+  
+  //Ethernet Code: This is sitting in setup, but I'm thinking about making it a function and including it in the loop so that reconnection is possible. Makes the code more robust
   Ethernet.begin(mac, ip);
   Serial.begin(9600);
   delay(1000);
