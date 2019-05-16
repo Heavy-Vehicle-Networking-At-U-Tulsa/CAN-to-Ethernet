@@ -31,13 +31,16 @@ uint32_t RXCount0 = 0;
 uint32_t RXCount1 = 0;
 
 //Define message structure from FlexCAN library
-static CAN_message_t rxmsg;
+static CAN_message_t rxmsg0;
+static CAN_message_t rxmsg1;
 static CAN_message_t txmsg;
+
+//LED indicator variables
 const int wLED = 16;
 const int rLED = 5;
-
 boolean wLED_state;
 boolean rLED_state;
+
 //A generic CAN Frame print function for the Serial terminal
 void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
 {
@@ -52,7 +55,36 @@ void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
   Serial.println();
 }
 
-
+//CAN Frame Serializer that turns the CAN_message_t type into a 16 byte array of all important items
+void serializeFrame(CAN_message_t rxmsg, uint8_t channel, uint8_t sFrame[16])
+{
+  //FlexCAN timestamp
+  uint16_t fTime = rxmsg.timestamp; //2 bytes
+  ////Serializing the timestamp
+  uint8_t fTimebyte1 = fTime>>8;
+  uint8_t fTimebyte2 = fTime;
+  //Message ID
+  ////We are going to shove the flag bits into the final 3 bits of the ID
+  uint32_t fullID = rxmsg.id << 3; //4 bytes
+  ////Here we create an 8 bit number to represent the flags (only really using final 3 bits)
+  uint8_t flags;
+  flags = flags | rxmsg.flags.extended;
+  flags = flags<<1;
+  flags = flags | rxmsg.flags.remote;
+  flags = flags<<1;
+  flags = flags | rxmsg.flags.overrun;
+  ////Serializing the ID byte
+  uint8_t fullIDbyte1 = fullID>>24;
+  uint8_t fullIDbyte2 = fullID>>16;
+  uint8_t fullIDbyte3 = fullID>>8;
+  uint8_t fullIDbyte4 = fullID>>0 | flags; //Combining the final id byte with the flag byte
+  uint8_t dlc = rxmsg.len; //1 byte
+  sFrame[0] = channel;
+  sFrame[1] = fTimebyte1;   sFrame[2] = fTimebyte2;
+  sFrame[3] = fullIDbyte1;  sFrame[4] = fullIDbyte2;  sFrame[5] = fullIDbyte3;  sFrame[6] = fullIDbyte4;
+  sFrame[7] = dlc;
+  for (int j = 8; j<16; j++) sFrame[j] = rxmsg.buf[j-8];
+}
 
 //Arduino Setup
 void setup()
@@ -94,11 +126,20 @@ void setup()
 
   while(!Serial);
   Serial.println("Starting CAN test.");
-  //Initialize the CAN channels with autobaud setting
+  
+  //Initialize the CAN channels with optional second channel if K66 processor (Teensy 3.6) Legacy feature from Teensy 3.2
   Can0.begin(0);
-  //Can1.begin(0);
-    
-  //Ethernet Code: This is sitting in setup, but I'm thinking about making it a function and including it in the loop so that reconnection is possible. Makes the code more robust
+  Can1.begin(0);
+  
+  static CAN_message_t rxmsg0;
+  
+  //Turn on MCP 2562 Chips
+  pinMode(14, OUTPUT); //CAN0
+  pinMode(35, OUTPUT); //CAN1
+  digitalWrite(14, LOW);
+  digitalWrite(35, LOW);
+     
+  //Ethernet Code: 
   Serial.println("Starting Ethernet Connection");
   Ethernet.begin(mac, ip);
   delay(1000);
@@ -106,10 +147,13 @@ void setup()
 
 void loop() {
   //Ethernet Connection Code
-  if (!client.connected()){
+  if (false){
+  //if (!client.connected()){
     Serial.println("Attempting to connect to server");
     client.connect(server, 59581);
     if (client.connected()){
+      rLED_state = true;
+      digitalWrite(rLED, rLED_state);
       Serial.println("Connected!");
     }
     else{
@@ -117,11 +161,17 @@ void loop() {
       digitalWrite(rLED, rLED_state);
       Serial.println("Connection Failed...");
     }
-  }
-  else{ //This code runs once the Server-Client connection is established 
-    while(Can0.read(rxmsg)){
-      
+  } 
+  else{
+    uint8_t smsg[16];
+    Serial.println("Connected to Server. Printing CAN Messages");
+    //delay(1000);
+    while(Can0.read(rxmsg0)){
+      printFrame(rxmsg0, 0, RXCount0++);
+      serializeFrame(rxmsg0, 0, smsg);
+      Serial.println("smsg");
+      for (int i = 0; i < sizeof(smsg); i++) Serial.println(smsg[i], HEX);
+      delay(3000);
     }
-  }
-  
+  } 
 }
