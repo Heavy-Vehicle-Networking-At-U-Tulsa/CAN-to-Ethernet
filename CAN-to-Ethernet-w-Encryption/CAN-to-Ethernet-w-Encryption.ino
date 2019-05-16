@@ -164,14 +164,11 @@ void loop() {
   } 
   else{
     uint8_t smsg[16];
-    Serial.println("Connected to Server. Printing CAN Messages");
-    //delay(1000);
+    //Serial.println("Connected to Server. Printing CAN Messages");
     while(Can0.read(rxmsg0)){
-      printFrame(rxmsg0, 0, RXCount0++);
       serializeFrame(rxmsg0, 0, smsg);
-      Serial.println("smsg");
-      for (int i = 0; i < sizeof(smsg); i++) Serial.println(smsg[i], HEX);
-      delay(3000);
+      for (int i = 0; i < sizeof(smsg); i++) Serial.print(smsg[i], HEX);
+      Serial.println();
     }
   } 
 }
