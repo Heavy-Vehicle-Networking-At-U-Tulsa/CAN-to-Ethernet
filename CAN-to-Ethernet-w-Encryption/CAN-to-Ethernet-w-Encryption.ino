@@ -35,6 +35,9 @@ static CAN_message_t rxmsg0;
 static CAN_message_t rxmsg1;
 static CAN_message_t txmsg;
 
+//So that we can send messages only once in the loop
+bool sayonce;
+
 //LED indicator variables
 const int wLED = 16;
 const int rLED = 5;
@@ -85,7 +88,7 @@ void serializeFrame(CAN_message_t rxmsg, uint8_t channel, uint8_t sFrame[16])
   sFrame[7] = dlc;
   for (int j = 8; j<16; j++) sFrame[j] = rxmsg.buf[j-8];
 }
-
+unsigned char keysched[4*60]; // Key schedule output. I don't really know how this works to be honest. I just know that for this data type
 //Arduino Setup
 void setup()
 {
@@ -108,7 +111,6 @@ void setup()
   // Ideally, this key will be generated through a Diffie-Helmann Key Exchange within the connection phase of the server-client connection
   // For now, this works. The important thing is that the key is 256 bits, or 32 bytes. more specifically, an array of 32 bytes. This will be important later
   
-  unsigned char keysched[4*60]; // Key schedule output. I don't really know how this works to be honest. I just know that for this data type
   mmcau_aes_set_key(aeskey, 256, keysched); //This is an AES key expansion. It accepts the variables that we just declared and it's output points to the keysched var
 
   //At this point we are prepared to do encryption of data. The data needs to be placed into 16 byte chunks. Current plan is to build the payload, encrypt it, then send it.
@@ -144,7 +146,8 @@ void setup()
   Ethernet.begin(mac, ip);
   delay(1000);
 }
-
+int location = 0;
+byte payload[1500];
 void loop() {
   //Ethernet Connection Code
   if (false){
@@ -163,12 +166,28 @@ void loop() {
     }
   } 
   else{
-    uint8_t smsg[16];
-    //Serial.println("Connected to Server. Printing CAN Messages");
-    while(Can0.read(rxmsg0)){
-      serializeFrame(rxmsg0, 0, smsg);
-      for (int i = 0; i < sizeof(smsg); i++) Serial.print(smsg[i], HEX);
-      Serial.println();
+    if (location >=1500){
+      client.write(payload,1500);
+      location = 0;
     }
-  } 
+    uint8_t sFrame[16];
+    if (sayonce != true){
+      Serial.println("Connected to Server. Printing CAN Messages");
+      sayonce = true;
+    }
+    while(Can0.read(rxmsg0)){
+      if (location <= 1500){
+        client.write(payload,1500);
+        location = 0;
+      }
+      serializeFrame(rxmsg0, 0, sFrame); //Turn the CAN frame into an array of 16 bytes
+      uint8_t encryptedFrame[16]; //declare the ecrypted var
+      mmcau_aes_encrypt(sFrame, keysched, 10, encryptedFrame); //fill encrypted var with encrypted byte block
+      
+      for (int i = 0; i <16; i++){
+        payload[location] = encryptedFrame[i];
+        location++;
+      }
+    }
+  }
 }
