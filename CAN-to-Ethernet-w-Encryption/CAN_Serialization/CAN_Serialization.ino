@@ -32,7 +32,7 @@ boolean rLED_state;
 void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
 {
   char CANdataDisplay[50];
-  sprintf(CANdataDisplay, "%lu %12l %12l %08l %l %l", channel, RXCount, micros(), rxmsg.id, rxmsg.ext, rxmsg.len);
+  sprintf(CANdataDisplay, "%d %12lu %12lu %08X %d %d", channel, RXCount, micros(), rxmsg.id, rxmsg.ext, rxmsg.len);
   Serial.print(CANdataDisplay);
   for (uint8_t i = 0; i < rxmsg.len; i++) {
     char CANBytes[4];
@@ -69,17 +69,31 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   while(Can0.read(rxmsg)){
+    printFrame(rxmsg, 0, RXCount0);
+    //Channel Indicator
     uint8_t channel = 0; //1 byte
+    //FlexCAN timestamp
     uint16_t fTime = rxmsg.timestamp; //2 bytes
-    byte fTimebyte1 =
-    byte fTimebyte2 = 
-    uint32_t fullID = rxmsg << 3; //4 bytes
-    byte fullIDbyte1 =
-    byte fullIDbyte2 =
-    byte fullIDbyte3 =
-    byte fullIDbyte4 =
+    ////Serializing the timestamp
+    uint8_t fTimebyte1 = fTime>>8;
+    uint8_t fTimebyte2 = fTime;
+    //Message ID
+    ////We are going to shove the flag bits into the final 3 bits of the ID
+    uint32_t fullID = rxmsg.id << 3; //4 bytes
+    ////Here we create an 8 bit number to represent the 
+    uint8_t flags;
+    flags = flags | rxmsg.flags.extended;
+    flags = flags<<1;
+    flags = flags | rxmsg.flags.remote;
+    flags = flags<<1;
+    flags = flags | rxmsg.flags.overrun;
+    ////Serializing the ID byte
+    uint8_t fullIDbyte1 = fullID>>24;
+    uint8_t fullIDbyte2 = fullID>>16;
+    uint8_t fullIDbyte3 = fullID>>8;
+    uint8_t fullIDbyte4 = fullID>>0 | flags;
     uint8_t dlc = rxmsg.len; //1 byte   
-    byte sFrame[16] = 
+    uint8_t sFrame[16] = 
     { 
       channel, 
       fTimebyte1, fTimebyte2, 
@@ -87,7 +101,9 @@ void loop() {
       dlc, 
       rxmsg.buf[0], rxmsg.buf[1], rxmsg.buf[2], rxmsg.buf[3], rxmsg.buf[4], rxmsg.buf[5], rxmsg.buf[6], rxmsg.buf[7]
     };
-    
+    for (int i = 0; i < sizeof(sFrame); i++) Serial.println((sFrame[i]));
+    Serial.println();
+    delay(3000);
   }
 
 }
