@@ -150,8 +150,7 @@ int location = 0;
 byte payload[1500];
 void loop() {
   //Ethernet Connection Code
-  if (false){
-  //if (!client.connected()){
+  if (!client.connected()){
     Serial.println("Attempting to connect to server");
     client.connect(server, 59581);
     if (client.connected()){
@@ -176,6 +175,8 @@ void loop() {
       sayonce = true;
     }
     while(Can0.read(rxmsg0)){
+      wLED_state = !wLED_state;
+      digitalWrite(wLED, wLED_state);
       if (location <= 1500){
         client.write(payload,1500);
         location = 0;
