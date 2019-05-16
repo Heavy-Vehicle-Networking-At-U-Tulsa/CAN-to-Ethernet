@@ -147,7 +147,6 @@ void setup()
   //Ethernet Code: 
   Serial.println("Starting Ethernet Connection");
   Ethernet.begin(mac, ip);
-  delay(1000);
 }
 int location = 0;
 byte payload[pSize];
@@ -168,7 +167,6 @@ void loop() {
     }
   } 
   else{
-    Serial.println(location);
     if (location >=pSize){
       Serial.println("SENT!");
       client.write(payload,pSize);
@@ -193,7 +191,7 @@ void loop() {
       }
       serializeFrame(rxmsg0, 0, sFrame); //Turn the CAN frame into an array of 16 bytes
       uint8_t encryptedFrame[16]; //declare the ecrypted var
-      mmcau_aes_encrypt(sFrame, keysched, 10, encryptedFrame); //fill encrypted var with encrypted byte block
+      mmcau_aes_encrypt(sFrame, keysched, 1, encryptedFrame); //fill encrypted var with encrypted byte block
       
       for (int i = 0; i <16; i++){
         payload[location] = encryptedFrame[i];
