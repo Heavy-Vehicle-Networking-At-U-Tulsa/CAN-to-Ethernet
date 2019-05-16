@@ -19,6 +19,8 @@
 
 const int pwmPin = 30;
 
+const int pSize = 1456;
+
 //Initialize the parameters for Ethernet
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192, 168, 1, 220 };
@@ -140,6 +142,7 @@ void setup()
   pinMode(35, OUTPUT); //CAN1
   digitalWrite(14, LOW);
   digitalWrite(35, LOW);
+  
      
   //Ethernet Code: 
   Serial.println("Starting Ethernet Connection");
@@ -147,16 +150,16 @@ void setup()
   delay(1000);
 }
 int location = 0;
-byte payload[1500];
+byte payload[pSize];
 void loop() {
   //Ethernet Connection Code
   if (!client.connected()){
-    Serial.println("Attempting to connect to server");
+    //Serial.println("Attempting to connect to server");
     client.connect(server, 59581);
     if (client.connected()){
       rLED_state = true;
       digitalWrite(rLED, rLED_state);
-      Serial.println("Connected!");
+      //Serial.println("Connected!");
     }
     else{
       rLED_state = !rLED_state;
@@ -165,8 +168,12 @@ void loop() {
     }
   } 
   else{
-    if (location >=1500){
-      client.write(payload,1500);
+    Serial.println(location);
+    if (location >=pSize){
+      Serial.println("SENT!");
+      client.write(payload,pSize);
+      Serial.println(sizeof(payload));
+      for (int i = 0; i < sizeof(payload); i++) Serial.print(payload[i]);
       location = 0;
     }
     uint8_t sFrame[16];
@@ -174,11 +181,14 @@ void loop() {
       Serial.println("Connected to Server. Printing CAN Messages");
       sayonce = true;
     }
+    while (location <pSize){
     while(Can0.read(rxmsg0)){
       wLED_state = !wLED_state;
       digitalWrite(wLED, wLED_state);
-      if (location <= 1500){
-        client.write(payload,1500);
+      if (location >= pSize){
+        client.write(payload,pSize);
+        Serial.println(sizeof(payload));
+        for (int i = 0; i < sizeof(payload); i++) Serial.print(payload[i]);
         location = 0;
       }
       serializeFrame(rxmsg0, 0, sFrame); //Turn the CAN frame into an array of 16 bytes
@@ -190,5 +200,7 @@ void loop() {
         location++;
       }
     }
+    }
+    Serial.println(location);
   }
 }
