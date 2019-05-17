@@ -17,14 +17,12 @@
 #include <FlexCAN.h>
 #include <CryptoAccel.h>
 
-const int pwmPin = 30;
-
-const int pSize = 1456;
-
 //Initialize the parameters for Ethernet
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192, 168, 1, 220 };
 byte server[] = { 192, 168, 1, 184 }; // Python Server IP
+//byte ip[] = { 169, 254, 215, 1 };
+//byte server[] = { 169, 254, 215, 1 }; // Python Server IP
 uint8_t test[] = {44,44,44,44};
 EthernetClient client;
 
@@ -39,6 +37,9 @@ static CAN_message_t txmsg;
 
 //So that we can send messages only once in the loop
 bool sayonce;
+
+//Set the size of the payload
+const int pSize = 1456;
 
 //LED indicator variables
 const int wLED = 16;
