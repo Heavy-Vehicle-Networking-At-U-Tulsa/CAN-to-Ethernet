@@ -20,7 +20,7 @@
 //Initialize the parameters for Ethernet
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 byte ip[] = { 192, 168, 1, 220 };
-byte server[] = { 192, 168, 1, 184 }; // Python Server IP
+byte server[] = { 192, 168, 1, 83 }; // Python Server IP
 //byte ip[] = { 169, 254, 215, 1 };
 //byte server[] = { 169, 254, 215, 1 }; // Python Server IP
 uint8_t test[] = {44,44,44,44};
@@ -95,6 +95,17 @@ unsigned char keysched[4*60]; // Key schedule output. I don't really know how th
 //Arduino Setup
 void setup()
 {
+  //testCANSEND: use for troubleshooting
+  txmsg.id = 0x18FEF100;
+  txmsg.timestamp = 0x1234;
+  txmsg.flags.extended = 1;
+  txmsg.flags.remote = 0;
+  txmsg.flags.overrun  = 0;
+  txmsg.len = 8;
+  for (int i = 0; i <9;i++){
+    txmsg.buf[i]=i+1;
+  }
+ 
   // Start of setup. Code that only runs once
   Serial.begin(9600);
   Serial.println("Made it to setup!");
@@ -119,7 +130,7 @@ void setup()
   //At this point we are prepared to do encryption of data. The data needs to be placed into 16 byte chunks. Current plan is to build the payload, encrypt it, then send it.
   
   //PWM Setup Code: Future project
-  pinMode(pwmPin, OUTPUT);
+  ////pinMode(pwmPin, OUTPUT);
   
   //LED Code for visualization
   pinMode(wLED, OUTPUT);
@@ -169,25 +180,22 @@ void loop() {
   } 
   else{
     if (location >=pSize){
-      Serial.println("SENT!");
+      //Serial.println("SENT!");
       client.write(payload,pSize);
-      Serial.println(sizeof(payload));
-      for (int i = 0; i < sizeof(payload); i++) Serial.print(payload[i]);
       location = 0;
     }
     uint8_t sFrame[16];
     if (sayonce != true){
-      Serial.println("Connected to Server. Printing CAN Messages");
+      Serial.println("Connected to Server. Sending Ethernet Messages");
       sayonce = true;
     }
     while (location <pSize){
+    Can1.write(txmsg);
     while(Can0.read(rxmsg0)){
       wLED_state = !wLED_state;
       digitalWrite(wLED, wLED_state);
       if (location >= pSize){
         client.write(payload,pSize);
-        Serial.println(sizeof(payload));
-        for (int i = 0; i < sizeof(payload); i++) Serial.print(payload[i]);
         location = 0;
       }
       serializeFrame(rxmsg0, 0, sFrame); //Turn the CAN frame into an array of 16 bytes
@@ -200,6 +208,5 @@ void loop() {
       }
     }
     }
-    Serial.println(location);
   }
 }
