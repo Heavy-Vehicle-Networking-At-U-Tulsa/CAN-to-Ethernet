@@ -39,51 +39,20 @@ def printFrame(canFrame):
         data = data + bite + ' '
     print(channel + '    ' + timestamp + '    ' + arbID + '    ' + extFlag + '    ' + data)
 
-class MyTCPHandler(socketserver.BaseRequestHandler):
+class MyUDPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
-        pSize = 1456
-        nFrames = 91
-        # self.request is the TCP socket connected to the client
-
-        self.data = self.request.recv(pSize)
-        payload = [0]*pSize
-        # This converts the encrypted data into humaan readable format, but does not decrypt
-        for byte in range(0, pSize):
-            payload[byte] = hex(self.data[byte])
-        partialLoad = payload
-        print(partialLoad)
-        for y in range(0, nFrames - 1):
-            pEncFrame = partialLoad[:16]
-            partialLoad = partialLoad[16:]
-            counter = 0
-            bFrame = [0] * 16
-            for item in pEncFrame:
-                bFrame[counter] = int(item, 16)
-                counter += 1
-            bFrame = bytearray(bFrame)
-            encFrame = [0] * 16
-            counter = 0
-            for item in bFrame:
-                encFrame[counter] = hex(item)
-                counter += 1
-            #printFrame(encFrame) # Encrypted Frame Print
-            ptFrame = decrypt(bFrame, key)
-            decFrame = [0]*16
-            counter = 0
-            for item in ptFrame:
-                decFrame[counter] = hex(item)
-                counter += 1
-            printFrame(decFrame) # Prints Decrypted Frame
-
+        data = self.request[0].strip()
+        socket = self.request[1]
+        print("{} wrote:".format(self.client_address[0]))
+        print(data)
+        socket.sendto(data.upper(), self.client_address)
 
 if __name__ == "__main__":
     HOST, PORT = "192.168.1.3", 59581  # Local Network
-    #HOST, PORT = "169.254.215.250", 59581  # Localhost, doesn't work
-
-
+ 
     # Create the server, binding to localhost on port 9999
-    with socketserver.TCPServer((HOST, PORT), MyTCPHandler) as server:
+    with socketserver.UDPServer((HOST, PORT), MyUDPHandler) as server:
         #server.timeout(10)
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
