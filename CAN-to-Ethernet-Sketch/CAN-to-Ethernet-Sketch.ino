@@ -11,22 +11,21 @@
  *
  * 
  */
-
-
 #include <Ethernet.h>
 #include <EthernetUdp.h>
 #include <FlexCAN.h>
 
 
 elapsedMillis heartbeat_timer;
+uint32_t heartbeat_counter;
+
 
 const int pwm1Pin = 20;
 const int pwm2Pin = 21;
 const int pwm3Pin = 22;
 
-#define UDP_TX_PACKET_MAX_SIZE 1450
-
-byte EthBuffer[1450];
+#define PACKET_MAX_SIZE 1450
+byte EthBuffer[PACKET_MAX_SIZE];
 
 //Initialize the parameters for Ethernet
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02 };
@@ -36,10 +35,11 @@ uint16_t port = 59581;
 
 EthernetUDP Udp;
 
+int location = 0;
 
 // buffers for receiving and sending data
-char packetBuffer[UDP_TX_PACKET_MAX_SIZE];  // buffer to hold incoming packet,
-char ReplyBuffer[] = "acknowledged";        // a string to send back
+char packetBuffer[PACKET_MAX_SIZE];  // buffer to hold incoming packet,
+char ReplyBuffer[] = "ack";        // a string to send back
 
 
 //Create a counter to keep track of message traffic
@@ -48,49 +48,18 @@ uint32_t RXCount1 = 0;
 
 //Define message structure from FlexCAN library
 static CAN_message_t rxmsg;
+static CAN_message_t rxmsg1;
 static CAN_message_t txmsg;
 
 boolean LED_state;
-////A generic CAN Frame print function for the Serial terminal
-//void printFrame(CAN_message_t rxmsg, uint8_t channel, uint32_t RXCount)
-//{
-//  char CANdataDisplay[50];
-//  sprintf(CANdataDisplay, "%d %12lu %12lu %08X %d %d", channel, RXCount, micros(), rxmsg.id, rxmsg.ext, rxmsg.len);
-//  Serial.print(CANdataDisplay);
-//  for (uint8_t i = 0; i < rxmsg.len; i++) {
-//    char CANBytes[4];
-//    sprintf(CANBytes, " %02X", rxmsg.buf[i]);
-//    Serial.print(CANBytes);
-//  }
-//  Serial.println();
-//}
-
-
 
 //Arduino Setup
 void setup()
 {
   // Start of setup. Code that only runs once
-  Serial.println("Made it to setup!");
-  
-  unsigned char aeskey[32] = 
-  {
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-  }; 
-  
-  // Okay, I'm cheating here by using a preset key. Shoot me. 
-  // Ideally, this key will be generated through a Diffie-Helmann Key Exchange within the connection phase of the server-client connection
-  // For now, this works. The important thing is that the key is 256 bits, or 32 bytes. more specifically, an array of 32 bytes. This will be important later
-  
-  unsigned char keysched[4*60]; // Key schedule output. I don't really know how this works to be honest. I just know that for this data type
-  mmcau_aes_set_key(aeskey, 256, keysched); //This is an AES key expansion. It accepts the variables that we just declared and it's output points to the keysched var
-
-  //At this point we are prepared to do encryption of data. The data needs to be placed into 16 byte chunks. Current plan is to build the payload, encrypt it, then send it.
-  
-  //PWM Setup Code: Future project
+  Serial.print("Max UDP Frame Size: ");
+  Serial.println(UDP_TX_PACKET_MAX_SIZE);
+  //PWM Setup Code:
   pinMode(pwm1Pin, OUTPUT);
   pinMode(pwm2Pin, OUTPUT);
   pinMode(pwm3Pin, OUTPUT);
@@ -117,7 +86,7 @@ void setup()
   }
 
   // start UDP
-  Udp.begin(localPort);
+  Udp.begin(port);
    
   
   
@@ -136,32 +105,22 @@ void setup()
   
   
 }
-int location = 0;
-uint32_t heartbeat_counter;
 
-uint32_t heartbeat_millis;
 
-char message[] = "I'm not Dead ";
 
 void send_heartbeat(){
+  char message[] = "I'm not Dead ";
   heartbeat_timer = 0;
   byte n = sizeof(message);
   EthBuffer[0] = n;
   memcpy(&EthBuffer[1],&message[0],n);
   heartbeat_counter++;
   memcpy(&EthBuffer[n+1],&heartbeat_counter,4);
-  heartbeat_millis = millis();
+  uint32_t heartbeat_millis = millis();
   memcpy(&EthBuffer[n+5],&heartbeat_millis,4);
   Udp.beginPacket(server, port);
   Udp.write(EthBuffer,n+9);
   Udp.endPacket();
-    
-  for (int i=0;i<n+9;i++){
-    Serial.print(EthBuffer[i],HEX);
-    Serial.print(" ");  
-  }
-  Serial.println();
-  
 }
 
 
@@ -189,6 +148,7 @@ void loop()
     Udp.read(packetBuffer, packetSize);
     Serial.println("Contents:");
     Serial.println(packetBuffer);
+    // Reset the buffer
     memset(packetBuffer,0x00,packetSize);
     // send a reply to the IP address and port that sent us the packet we received
     Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
@@ -269,7 +229,7 @@ void loop()
       long lastSend = millis();
     }
   }
-  //if (!Can0.read(rxmsg)){
+  //if (!Can0.read(rxmsg0)){
     //long currentTime = millis();
     //if (currentTime - lastSend >=5000){
     //  client.write(EthBuffer, location);
@@ -277,8 +237,8 @@ void loop()
     //}
   //}
   #if defined(__MK66FX1M0__)
-  while (Can1.read(rxmsg)) {
-//    printFrame(rxmsg,1,RXCount1++);
+  while (Can1.read(rxmsg1)) {
+//    printFrame(rxmsg1,1,RXCount1++);
     LED_state = !LED_state;
     digitalWrite(LED_BUILTIN, LED_state);
    }
