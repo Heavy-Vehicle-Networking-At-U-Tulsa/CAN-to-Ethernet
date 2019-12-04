@@ -16,13 +16,23 @@
 #include <FlexCAN.h>
 
 
+#define HEARTBEAT_MESSAGE_PERIOD_MS 5000
+#define CAN_SEND_TIMEOUT_MS 100
+#define MAX_MESSAGE_COUNT 25
+#define CAN_MESSAGE_SIZE 25
+
+uint8_t message_count = 0;
+
 elapsedMillis heartbeat_timer;
+elapsedMillis CAN_send_timer;
 uint32_t heartbeat_counter;
 
 
 const int pwm1Pin = 20;
 const int pwm2Pin = 21;
 const int pwm3Pin = 22;
+const int DAC0Pin = A21;
+const int DAC1Pin = A22;
 
 #define PACKET_MAX_SIZE 1450
 byte EthBuffer[PACKET_MAX_SIZE];
@@ -39,7 +49,6 @@ int location = 0;
 
 // buffers for receiving and sending data
 char packetBuffer[PACKET_MAX_SIZE];  // buffer to hold incoming packet,
-char ReplyBuffer[] = "ack";        // a string to send back
 
 
 //Create a counter to keep track of message traffic
@@ -48,7 +57,6 @@ uint32_t RXCount1 = 0;
 
 //Define message structure from FlexCAN library
 static CAN_message_t rxmsg;
-static CAN_message_t rxmsg1;
 static CAN_message_t txmsg;
 
 boolean LED_state;
@@ -58,12 +66,16 @@ void setup()
 {
   // Start of setup. Code that only runs once
   Serial.print("Max UDP Frame Size: ");
-  Serial.println(UDP_TX_PACKET_MAX_SIZE);
+  Serial.println(PACKET_MAX_SIZE);
+  
   //PWM Setup Code:
   pinMode(pwm1Pin, OUTPUT);
   pinMode(pwm2Pin, OUTPUT);
   pinMode(pwm3Pin, OUTPUT);
-
+  pinMode(DAC0Pin, OUTPUT);
+  analogWrite(DAC0Pin,2047); // Mid range of 12-bit resolution
+  pinMode(DAC1Pin, OUTPUT);
+  analogWrite(DAC1Pin,2047); // Mid range of 12-bit resolution
   
   //LED Code for visualization
   pinMode(LED_BUILTIN, OUTPUT);
@@ -74,9 +86,10 @@ void setup()
   
   //Ethernet Code: This is sitting in setup, but I'm thinking about making it a function and including it in the loop so that reconnection is possible. Makes the code more robust
   Ethernet.begin(mac, ip);
+  
   // Check for Ethernet hardware present
   if (Ethernet.hardwareStatus() == EthernetNoHardware) {
-    Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware. :(");
+    Serial.println("Ethernet shield was not found.  Sorry, can't run without hardware.");
     while (true) {
       delay(1); // do nothing, no point running without Ethernet hardware
     }
@@ -87,25 +100,19 @@ void setup()
 
   // start UDP
   Udp.begin(port);
-   
   
-  
-  Serial.println("Connecting to Ethernet Server");
-
-//  if (client.connect(server, )) {
-//    Serial.println("connected");
-//  } else {
-//    Serial.println("connection failed");
-//  }
   //Initialize the CAN channels with autobaud setting
   Can0.begin(0);
+  Serial.println("CAN0 Started");
   #if defined(__MK66FX1M0__)
   Can1.begin(0);
+  Serial.println("CAN1 Started");
   #endif
-  
-  
 }
-
+/*
+ * The heartbeat signal is a simple test to show there is basic connectivity. 
+ * This should be transmitted infreqently
+ */
 
 
 void send_heartbeat(){
@@ -123,57 +130,21 @@ void send_heartbeat(){
   Udp.endPacket();
 }
 
+void send_CAN_buffer(){
+  CAN_send_timer = 0;
+  location = 1;
+  EthBuffer[0] = message_count;
+  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+  byte sent_bytes = Udp.write(EthBuffer,message_count*CAN_MESSAGE_SIZE+1);
+  Udp.endPacket();
+  Serial.print("Num of bytes for CAN data: ");
+  Serial.println(sent_bytes);
+}
 
-void loop()
-{
-  if (heartbeat_timer > 2000) send_heartbeat();
-  
-  // if there's data available, read a packet
-  int packetSize = Udp.parsePacket();
-  if (packetSize) {
-    Serial.print("Received packet of size ");
-    Serial.println(packetSize);
-    Serial.print("From ");
-    IPAddress remote = Udp.remoteIP();
-    for (int i=0; i < 4; i++) {
-      Serial.print(remote[i], DEC);
-      if (i < 3) {
-        Serial.print(".");
-      }
-    }
-    Serial.print(", port ");
-    Serial.println(Udp.remotePort());
-
-    // read the packet into packetBufffer
-    Udp.read(packetBuffer, packetSize);
-    Serial.println("Contents:");
-    Serial.println(packetBuffer);
-    // Reset the buffer
-    memset(packetBuffer,0x00,packetSize);
-    // send a reply to the IP address and port that sent us the packet we received
-    Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-    Udp.write(ReplyBuffer);
-    Udp.endPacket();
-  }
-  
-  while (Can0.read(rxmsg)) { // Can 0 Teensy is Can1 Beagle
-//    if (pOut <= 255){
-//      analogWrite(pwmPin, pOut);
-//      pOut++;
-//    }
-//    else{
-//      pOut = 245;
-//      analogWrite(pwmPin, pOut);
-//      pOut++;
-//    }
-//    if (rxmsg.id == 0x08FE6E0B){
-//      printFrame(rxmsg,0,RXCount0++);
-//    }
-    
-    LED_state = !LED_state;
-    digitalWrite(LED_BUILTIN, LED_state);
-    //Start of buffer loading
+void load_ethernet_buffer(uint8_t can_channel){
+   //Start of buffer loading
     // ID 32
+    message_count++; // increment the count by 1
     EthBuffer[location] = uint8_t (rxmsg.id>>24); // Grabs the first 8 bits
     location++;
     EthBuffer[location] = uint8_t (rxmsg.id>>16); // grabs the last 8 bits of the first 16 bits
@@ -205,13 +176,8 @@ void loop()
     location++;
     EthBuffer[location] = uint8_t(rxmsg.timestamp>>0);
     location++;
-    //// flags
-    //byte flag;
-    //bitWrite(flag, 7, 
-    //EthBuffer[location] = uint8_t(flag);
-    // Instead of a flag, I'm going to indicate can Channel
-    byte canChannel=0;
-    EthBuffer[location]=uint8_t(canChannel);
+    // CAN Channel
+    EthBuffer[location]=uint8_t(can_channel);
     location++;
     // len 8
     EthBuffer[location] = uint8_t(rxmsg.len);
@@ -221,21 +187,55 @@ void loop()
       EthBuffer[location] = rxmsg.buf[i];
       location++;
     }
-    EthBuffer[location]=0;
-    location++;
-    if (location >=1450){
-      location = 0;
-      Udp.write(EthBuffer,1450);
-      long lastSend = millis();
+    if (location >= MAX_MESSAGE_COUNT * CAN_MESSAGE_SIZE){
+      send_CAN_buffer()
     }
+}
+
+void loop()
+{
+  if (heartbeat_timer > HEARTBEAT_MESSAGE_PERIOD_MS) send_heartbeat();
+
+  if (CAN_send_timer > CAN_SEND_TIMEOUT_MS) send_CAN_buffer();
+  
+  // if there's data available, read a packet
+  int packetSize = Udp.parsePacket();
+  if (packetSize) {
+    Serial.print("Received packet of size ");
+    Serial.println(packetSize);
+    Serial.print("From ");
+    IPAddress remote = Udp.remoteIP();
+    for (int i=0; i < 4; i++) {
+      Serial.print(remote[i], DEC);
+      if (i < 3) {
+        Serial.print(".");
+      }
+    }
+    Serial.print(", port ");
+    Serial.println(Udp.remotePort());
+
+    // read the packet into packetBufffer
+    Udp.read(packetBuffer, packetSize);
+    Serial.println("Contents:");
+    Serial.println(packetBuffer);
+    // Reset the buffer
+    memset(packetBuffer,0x00,packetSize);
+    // send a reply to the IP address and port that sent us the packet we received
+    Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+    Udp.write(ReplyBuffer);
+    Udp.endPacket();
   }
-  //if (!Can0.read(rxmsg0)){
-    //long currentTime = millis();
-    //if (currentTime - lastSend >=5000){
-    //  client.write(EthBuffer, location);
-    //  client.stop();
-    //}
-  //}
+  
+  while (Can0.read(rxmsg)) {
+    //Blink the LED to show CAN traffic
+    LED_state = !LED_state;
+    digitalWrite(LED_BUILTIN, LED_state);
+    CAN_channel = 0;
+    load_ethernet_buffer(CAN_channel);
+    
+   
+  }
+
   #if defined(__MK66FX1M0__)
   while (Can1.read(rxmsg1)) {
 //    printFrame(rxmsg1,1,RXCount1++);
