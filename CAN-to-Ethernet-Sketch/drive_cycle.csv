@@ -1,0 +1,7 @@
+"Description: This drive cycel profile shows where J1939 Suspect Parameter Numbers (SPNs) change in time. For each line, there is series of SPNs that change. These are grouped in threes in the following format (J1939 Source Address, SPN, and engineering value). This tuple can uniquely identify the individual sensor to simulate.",,,,,,,,,,,,,,,,
+Sample,Time,Source,SPN,Value,Source,SPN,Value,Source,SPN,Value,Source,SPN,Value,…,,
+1,2,0,190,600,11,1592,0,12,1593,0,11,1594,0,11,1595,0
+2,4,11,84,12.45,11,1592,15,12,1593,20,11,1594,25,11,1595,30
+3,5,11,84,13,11,1592,20,12,1593,30,11,1594,44.4,11,1595,50.5
+4,6.7,11,84,57.12348495,11,1592,15,12,1593,44.222,11,1594,74.22222222,11,1595,100
+5,10,,,,,,,,,,,,,,,
